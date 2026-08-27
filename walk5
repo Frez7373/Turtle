@@ -1,29 +1,12 @@
 -- =========================================
--- TURTLE ROAD WALKER
--- Ходит только по полированному андезиту
+-- WALK5 - POLISHED ANDESITE ROAD WALKER
 -- CC:Tweaked
 -- =========================================
 
 local ROAD = "minecraft:polished_andesite"
-
--- 0 = вперед (текущее направление)
--- 1 = право
--- 2 = назад
--- 3 = лево
 local heading = 0
 
-local DIRECTIONS = {
-    [0] = 0,   -- вперед
-    [1] = 1,   -- право
-    [2] = 2,   -- назад
-    [3] = 3    -- лево
-}
-
 math.randomseed(os.epoch("utc"))
-
---------------------------------------------------
--- Повороты
---------------------------------------------------
 
 local function turnRight()
     turtle.turnRight()
@@ -32,7 +15,7 @@ end
 
 local function turnLeft()
     turtle.turnLeft()
-    heading = (heading - 1) % 4
+    heading = (heading + 3) % 4
 end
 
 local function turnAround()
@@ -43,202 +26,137 @@ end
 
 local function turnTo(dir)
     local diff = (dir - heading) % 4
-
     if diff == 1 then
         turnRight()
-
     elseif diff == 2 then
         turnAround()
-
     elseif diff == 3 then
         turnLeft()
     end
 end
 
---------------------------------------------------
--- Проверяем, стоит ли черепашка на дороге
---------------------------------------------------
-
-local function onRoad()
+local function isRoadBelow()
     local ok, block = turtle.inspectDown()
-
-    if not ok then
-        return false
-    end
-
-    return block.name == ROAD
+    return ok and block and block.name == ROAD
 end
 
---------------------------------------------------
--- Проверяем направление
---
--- Черепашка реально делает шаг вперед,
--- смотрит что находится под ней,
--- затем возвращается назад.
---
--- Поэтому не нужно знать заранее,
--- где именно находится соседняя дорожка.
---------------------------------------------------
-
-local function testDirection(dir)
-    turnTo(dir)
-
-    -- Есть блок прямо перед черепашкой?
+local function roadAhead()
     if turtle.detect() then
         return false
     end
 
-    -- Пробуем сделать один шаг
     if not turtle.forward() then
         return false
     end
 
-    -- Проверяем поверхность под новой клеткой
-    local road = onRoad()
-
-    -- Возвращаемся обратно
+    local road = isRoadBelow()
     turtle.back()
-
     return road
 end
 
---------------------------------------------------
--- Собираем все доступные направления дороги
---------------------------------------------------
-
-local function findRoads()
-    local roads = {}
-
-    for dir = 0, 3 do
-        if testDirection(dir) then
-            table.insert(roads, dir)
-        end
-    end
-
-    return roads
+local function checkDirection(dir)
+    turnTo(dir)
+    return roadAhead()
 end
 
---------------------------------------------------
--- Выбор направления
---
--- Если есть несколько вариантов:
--- 1. стараемся идти вперед;
--- 2. затем случайно выбираем левый/правый;
--- 3. назад используем только если другого пути нет.
---------------------------------------------------
+local function chooseDirection()
+    local forward = heading
+    local left = (heading + 3) % 4
+    local right = (heading + 1) % 4
+    local back = (heading + 2) % 4
 
-local lastDirection = nil
-
-local function chooseDirection(roads)
-
-    if #roads == 0 then
-        return nil
+    if checkDirection(forward) then
+        return forward
     end
 
-    -- Если есть хотя бы два варианта,
-    -- стараемся не разворачиваться назад.
-    local normal = {}
-
-    for _, dir in ipairs(roads) do
-        if lastDirection == nil or
-           dir ~= ((lastDirection + 2) % 4) then
-
-            table.insert(normal, dir)
+    if math.random(1, 2) == 1 then
+        if checkDirection(left) then
+            return left
+        end
+        if checkDirection(right) then
+            return right
+        end
+    else
+        if checkDirection(right) then
+            return right
+        end
+        if checkDirection(left) then
+            return left
         end
     end
 
-    if #normal > 0 then
-        roads = normal
+    if checkDirection(back) then
+        return back
     end
 
-    -- Сначала пытаемся продолжать прямо
-    for _, dir in ipairs(roads) do
-        if dir == 0 then
-            -- 70% шанс идти прямо
-            if math.random(1, 100) <= 70 then
-                return dir
-            end
-        end
-    end
-
-    -- Иначе случайный доступный путь
-    return roads[math.random(1, #roads)]
+    return nil
 end
 
---------------------------------------------------
--- Основной цикл
---------------------------------------------------
+local function moveOneBlock(dir)
+    turnTo(dir)
+
+    if turtle.detect() then
+        return false
+    end
+
+    return turtle.forward()
+end
 
 print("================================")
-print("     ROAD WALKER STARTED")
+print(" WALK5 - ROAD WALKER")
 print("================================")
 print("Road: polished andesite")
 print("")
 
--- Проверяем, что стартуем с дороги
-if not onRoad() then
-    print("WARNING:")
-    print("Turtle is NOT on polished andesite!")
-    print("Place turtle on the road.")
+if isRoadBelow() then
+    print("Road detected!")
+else
+    print("WARNING: turtle is not on road")
+    print("Place turtle on polished andesite")
 end
 
+sleep(1)
+term.clear()
+term.setCursorPos(1, 1)
+
 while true do
-
-    -- Проверяем, что мы всё ещё на дороге
-    if not onRoad() then
-
+    if not isRoadBelow() then
         print("Searching for road...")
 
-        -- Пытаемся найти дорогу рядом
-        local roads = findRoads()
+        local found = false
+        local dirs = {
+            heading,
+            (heading + 1) % 4,
+            (heading + 3) % 4,
+            (heading + 2) % 4
+        }
 
-        if #roads > 0 then
-            local dir = chooseDirection(roads)
-
-            turnTo(dir)
-
-            if turtle.forward() then
-                lastDirection = dir
+        for _, dir in ipairs(dirs) do
+            if checkDirection(dir) then
+                if moveOneBlock(dir) then
+                    found = true
+                    break
+                end
             end
-        else
-            -- Ничего рядом нет
-            -- медленно вращаемся в поисках дороги
-            turnRight()
-            sleep(0.2)
         end
 
+        if not found then
+            sleep(1)
+        end
     else
-
-        -- Мы на дороге
-        local roads = findRoads()
-
-        local dir = chooseDirection(roads)
+        local dir = chooseDirection()
 
         if dir ~= nil then
-
-            turnTo(dir)
-
-            -- Ещё раз проверяем препятствие
-            if not turtle.detect() then
-
-                if turtle.forward() then
-                    lastDirection = dir
-                end
-
+            if not moveOneBlock(dir) then
+                sleep(0.2)
             end
-
         else
-            -- Тупик
-            -- разворачиваемся
             turnAround()
-
             if not turtle.detect() then
-                if turtle.forward() then
-                    lastDirection = 2
-                end
+                turtle.forward()
             end
         end
     end
 
-    sleep(0.15)
+    sleep(0.25)
 end
