@@ -1,0 +1,197 @@
+-- SMART POLISHED ANDESITE ROAD WALKER
+-- CC:Tweaked
+
+local ROAD = "minecraft:polished_andesite"
+
+local function isRoadAt(x, y, z)
+    local block = turtle.inspectDown()
+
+    if x == 0 and y == 0 and z == 0 then
+        return block and block.name == ROAD
+    end
+
+    return false
+end
+
+local function inspectRoad(direction)
+    local ok, data
+
+    if direction == "forward" then
+        ok, data = turtle.inspect()
+    elseif direction == "left" then
+        turtle.turnLeft()
+        ok, data = turtle.inspect()
+        turtle.turnRight()
+    elseif direction == "right" then
+        turtle.turnRight()
+        ok, data = turtle.inspect()
+        turtle.turnLeft()
+    elseif direction == "back" then
+        turtle.turnLeft()
+        turtle.turnLeft()
+        ok, data = turtle.inspect()
+        turtle.turnRight()
+        turtle.turnRight()
+    end
+
+    if ok and data then
+        return data.name == ROAD
+    end
+
+    return false
+end
+
+local function blocked(direction)
+    local ok
+
+    if direction == "forward" then
+        ok = turtle.detect()
+
+    elseif direction == "left" then
+        turtle.turnLeft()
+        ok = turtle.detect()
+        turtle.turnRight()
+
+    elseif direction == "right" then
+        turtle.turnRight()
+        ok = turtle.detect()
+        turtle.turnLeft()
+
+    elseif direction == "back" then
+        turtle.turnLeft()
+        turtle.turnLeft()
+        ok = turtle.detect()
+        turtle.turnRight()
+        turtle.turnRight()
+    end
+
+    return ok
+end
+
+local function safeForward()
+    if turtle.detect() then
+        return false
+    end
+
+    return turtle.forward()
+end
+
+local function turnLeft()
+    turtle.turnLeft()
+end
+
+local function turnRight()
+    turtle.turnRight()
+end
+
+local function turnBack()
+    turtle.turnLeft()
+    turtle.turnLeft()
+end
+
+-- Проверяет, есть ли дорога перед черепашкой.
+-- Сначала смотрим на блок впереди.
+-- Затем пытаемся понять, является ли продолжение дороги
+-- следующим блоком после поворота.
+
+local function roadAhead()
+    local ok, data = turtle.inspect()
+
+    if not ok then
+        return false
+    end
+
+    return data.name == ROAD
+end
+
+local function chooseDirection()
+
+    -- 1. Прямо
+    if roadAhead() and not blocked("forward") then
+        return "forward"
+    end
+
+    -- 2. Слева
+    if inspectRoad("left") and not blocked("left") then
+        return "left"
+    end
+
+    -- 3. Справа
+    if inspectRoad("right") and not blocked("right") then
+        return "right"
+    end
+
+    -- 4. Назад
+    if inspectRoad("back") and not blocked("back") then
+        return "back"
+    end
+
+    return nil
+end
+
+print("SMART ROAD WALKER")
+print("------------------")
+print("Road: polished andesite")
+print("Starting...")
+
+sleep(2)
+
+while true do
+
+    -- Смотрим на дорожку под черепашкой
+    local down = turtle.inspectDown()
+
+    if not down then
+        print("WARNING: No block below!")
+    elseif down.name ~= ROAD then
+        print("Looking for road...")
+    end
+
+    local direction = chooseDirection()
+
+    if direction == "forward" then
+
+        if not turtle.detect() then
+            turtle.forward()
+        end
+
+    elseif direction == "left" then
+
+        turtle.turnLeft()
+
+        if not turtle.detect() then
+            turtle.forward()
+        end
+
+    elseif direction == "right" then
+
+        turtle.turnRight()
+
+        if not turtle.detect() then
+            turtle.forward()
+        end
+
+    elseif direction == "back" then
+
+        turtle.turnLeft()
+        turtle.turnLeft()
+
+        if not turtle.detect() then
+            turtle.forward()
+        end
+
+    else
+
+        -- Если дорожки прямо/слева/справа нет,
+        -- медленно проверяем окружение
+
+        turtle.turnRight()
+        sleep(0.2)
+
+        if turtle.detect() then
+            turtle.turnRight()
+        end
+    end
+
+    sleep(0.2)
+end
