@@ -1,0 +1,287 @@
+-- SMART POLISHED ANDESITE ROAD WALKER
+-- CC:Tweaked
+-- Version 2
+
+local ROAD = "minecraft:polished_andesite"
+
+-- Настройки
+local STEP_DELAY = 0.15
+local TURN_DELAY = 0.1
+
+math.randomseed(os.epoch("utc"))
+
+--------------------------------------------------
+-- BLOCK CHECKS
+--------------------------------------------------
+
+local function getBlockDown()
+    local ok, data = turtle.inspectDown()
+
+    if ok and data then
+        return data.name
+    end
+
+    return nil
+end
+
+local function isOnRoad()
+    return getBlockDown() == ROAD
+end
+
+local function obstacleAhead()
+    return turtle.detect()
+end
+
+--------------------------------------------------
+-- MOVEMENT
+--------------------------------------------------
+
+local function moveForward()
+    -- Никогда не пытаемся пройти через блок
+    if turtle.detect() then
+        return false
+    end
+
+    local success = turtle.forward()
+
+    if success then
+        sleep(STEP_DELAY)
+        return true
+    end
+
+    return false
+end
+
+local function moveBack()
+    turtle.back()
+    sleep(STEP_DELAY)
+end
+
+local function turnLeft()
+    turtle.turnLeft()
+    sleep(TURN_DELAY)
+end
+
+local function turnRight()
+    turtle.turnRight()
+    sleep(TURN_DELAY)
+end
+
+local function turnAround()
+    turtle.turnLeft()
+    turtle.turnLeft()
+    sleep(TURN_DELAY)
+end
+
+--------------------------------------------------
+-- TRY A DIRECTION
+--------------------------------------------------
+
+-- Пытаемся пройти в направлении.
+-- После движения проверяем, находится ли черепашка
+-- на полированном андезите.
+--
+-- Если нет — возвращаемся обратно.
+
+local function tryForward()
+    if obstacleAhead() then
+        return false
+    end
+
+    if not moveForward() then
+        return false
+    end
+
+    if isOnRoad() then
+        return true
+    end
+
+    -- Попали не на дорогу.
+    -- Возвращаемся обратно.
+    turnAround()
+
+    if not obstacleAhead() then
+        moveForward()
+    end
+
+    turnAround()
+
+    return false
+end
+
+--------------------------------------------------
+-- CHOOSE PATH
+--------------------------------------------------
+
+local function choosePath()
+
+    -- Случайно меняем порядок,
+    -- чтобы черепашка не ходила постоянно
+    -- только налево или только направо.
+
+    local choice = math.random(1, 4)
+
+    if choice == 1 then
+
+        -- Прямо
+        if tryForward() then
+            return true
+        end
+
+        turnLeft()
+
+        if tryForward() then
+            return true
+        end
+
+        turnRight()
+        turnRight()
+
+        if tryForward() then
+            return true
+        end
+
+        turnLeft()
+
+    elseif choice == 2 then
+
+        -- Налево
+        turnLeft()
+
+        if tryForward() then
+            return true
+        end
+
+        turnRight()
+
+        -- Прямо
+        if tryForward() then
+            return true
+        end
+
+        turnRight()
+
+        -- Направо
+        if tryForward() then
+            return true
+        end
+
+        turnLeft()
+
+    elseif choice == 3 then
+
+        -- Направо
+        turnRight()
+
+        if tryForward() then
+            return true
+        end
+
+        turnLeft()
+
+        -- Прямо
+        if tryForward() then
+            return true
+        end
+
+        turnLeft()
+
+        -- Налево
+        if tryForward() then
+            return true
+        end
+
+        turnRight()
+
+    else
+
+        -- Сначала прямо
+        if tryForward() then
+            return true
+        end
+
+        -- Назад
+        turnAround()
+
+        if tryForward() then
+            return true
+        end
+
+        turnAround()
+
+        -- Налево
+        turnLeft()
+
+        if tryForward() then
+            return true
+        end
+
+        -- Направо
+        turnRight()
+        turnRight()
+
+        if tryForward() then
+            return true
+        end
+
+        turnLeft()
+    end
+
+    return false
+end
+
+--------------------------------------------------
+-- START
+--------------------------------------------------
+
+term.clear()
+term.setCursorPos(1, 1)
+
+print("SMART ROAD WALKER")
+print("=================")
+print("")
+print("Road:")
+print("Polished Andesite")
+print("")
+print("Starting...")
+sleep(2)
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+
+while true do
+
+    -- Если под черепашкой нет дороги,
+    -- пытаемся найти её.
+
+    if not isOnRoad() then
+
+        print("Searching for road...")
+
+        -- Вращаемся и ищем подходящий путь.
+        for i = 1, 4 do
+
+            if tryForward() then
+                break
+            end
+
+            turnRight()
+        end
+
+    else
+
+        -- Мы на дороге.
+
+        -- Сначала пытаемся идти вперёд.
+        if not tryForward() then
+
+            -- Впереди либо препятствие,
+            -- либо дорога поворачивает.
+
+            choosePath()
+        end
+    end
+
+    sleep(STEP_DELAY)
+end
