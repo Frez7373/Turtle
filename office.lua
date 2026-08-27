@@ -1,6 +1,3 @@
-local supply = require("supply")
-supply.start()
-
 -- =========================================================
 --              AMERICAN OFFICE BUILDER
 --                    CC:Tweaked Turtle
@@ -25,24 +22,18 @@ supply.start()
 --
 -- Size: 15 x 11
 -- Floors: 2
---
--- Automatic supply system:
--- The turtle returns to this exact starting point when the
--- selected building material has 1 item left, scans the wired
--- storage chest for the required item, refills the slot, and
--- returns to the exact construction position.
 -- =========================================================
 
-local WALL = 1
-local GLASS = 2
-local DOOR = 3
-local ROOF = 4
+local WALL       = 1
+local GLASS      = 2
+local DOOR       = 3
+local ROOF       = 4
 local FOUNDATION = 5
-local FLOOR = 6
-local STAIRS = 7
-local LIGHT = 8
-local INTERIOR = 9
-local TRIM = 10
+local FLOOR      = 6
+local STAIRS     = 7
+local LIGHT      = 8
+local INTERIOR   = 9
+local TRIM       = 10
 
 local W = 15
 local D = 11
@@ -53,7 +44,7 @@ local function need(slot)
     turtle.select(slot)
     while turtle.getItemCount(slot) == 0 do
         print("OUT OF MATERIAL - SLOT " .. slot)
-        print("Put one starter item in this slot and press ENTER")
+        print("Insert items and press ENTER")
         read()
         turtle.select(slot)
     end
@@ -61,66 +52,99 @@ end
 
 local function place(slot)
     need(slot)
-    if not turtle.place() then turtle.dig(); turtle.place() end
+    if not turtle.place() then
+        turtle.dig()
+        turtle.place()
+    end
 end
 
 local function placeDown(slot)
     need(slot)
-    if not turtle.placeDown() then turtle.digDown(); turtle.placeDown() end
+    if not turtle.placeDown() then
+        turtle.digDown()
+        turtle.placeDown()
+    end
 end
 
 local function placeUp(slot)
     need(slot)
-    if not turtle.placeUp() then turtle.digUp(); turtle.placeUp() end
+    if not turtle.placeUp() then
+        turtle.digUp()
+        turtle.placeUp()
+    end
 end
 
 local function forward()
     while not turtle.forward() do
-        if turtle.detect() then turtle.dig() else sleep(0.15) end
+        if turtle.detect() then
+            turtle.dig()
+        else
+            sleep(0.15)
+        end
     end
 end
 
 local function up()
     while not turtle.up() do
-        if turtle.detectUp() then turtle.digUp() else sleep(0.15) end
+        if turtle.detectUp() then
+            turtle.digUp()
+        else
+            sleep(0.15)
+        end
     end
 end
 
 local function down()
     while not turtle.down() do
-        if turtle.detectDown() then turtle.digDown() else sleep(0.15) end
+        if turtle.detectDown() then
+            turtle.digDown()
+        else
+            sleep(0.15)
+        end
     end
 end
 
-local function right() turtle.turnRight() end
-local function left() turtle.turnLeft() end
-local function move(n) for _ = 1, n do forward() end end
+local function right()
+    turtle.turnRight()
+end
+
+local function left()
+    turtle.turnLeft()
+end
+
+local function move(n)
+    for _ = 1, n do forward() end
+end
 
 local function fuel()
     if turtle.getFuelLevel() == "unlimited" then return end
+
     if turtle.getFuelLevel() < 100 then
         for slot = 1, 16 do
             turtle.select(slot)
-            if turtle.refuel(0) then turtle.refuel() end
+            if turtle.refuel(0) then
+                turtle.refuel()
+            end
         end
     end
+
     while turtle.getFuelLevel() < 100 do
         print("LOW FUEL")
-        print("Put fuel in the turtle and press ENTER")
+        print("Put coal or another fuel in the turtle.")
+        print("Press ENTER")
         read()
         for slot = 1, 16 do
             turtle.select(slot)
-            if turtle.refuel(0) then turtle.refuel() end
+            if turtle.refuel(0) then
+                turtle.refuel()
+            end
         end
     end
 end
 
-------------------------------------------------------------
--- FOUNDATION / FLOOR
-------------------------------------------------------------
-
 local function foundation()
     print("[1/8] Foundation")
+
     forward()
 
     for z = 1, D do
@@ -128,40 +152,80 @@ local function foundation()
             placeDown(FOUNDATION)
             if x < W then forward() end
         end
+
         if z < D then
-            if z % 2 == 1 then right(); forward(); right() else left(); forward(); left() end
+            if z % 2 == 1 then
+                right()
+                forward()
+                right()
+            else
+                left()
+                forward()
+                left()
+            end
         end
     end
 
-    if D % 2 == 1 then left(); move(D - 1); left() else right(); move(D - 1); right() end
+    if D % 2 == 1 then
+        left()
+        move(D - 1)
+        left()
+    else
+        right()
+        move(D - 1)
+        right()
+    end
+
     move(W - 1)
     right()
 
     print("Building ground floor...")
+
     for z = 1, D do
         for x = 1, W do
             placeDown(FLOOR)
             if x < W then forward() end
         end
+
         if z < D then
-            if z % 2 == 1 then right(); forward(); right() else left(); forward(); left() end
+            if z % 2 == 1 then
+                right()
+                forward()
+                right()
+            else
+                left()
+                forward()
+                left()
+            end
         end
     end
 
-    if D % 2 == 1 then left(); move(D - 1); left() else right(); move(D - 1); right() end
+    if D % 2 == 1 then
+        left()
+        move(D - 1)
+        left()
+    else
+        right()
+        move(D - 1)
+        right()
+    end
+
     move(W - 1)
     left()
 end
-
-------------------------------------------------------------
--- OUTER WALLS
-------------------------------------------------------------
 
 local function frontWall(level)
     for x = 1, W do
         local door = (x == 7 or x == 8 or x == 9) and level <= 2
         local window = ((x == 2 or x == 3 or x == 12 or x == 13) and level >= 2 and level <= 4)
-        if not door then if window then place(GLASS) else place(WALL) end end
+
+        if door then
+        elseif window then
+            place(GLASS)
+        else
+            place(WALL)
+        end
+
         if x < W then forward() end
     end
 end
@@ -169,7 +233,13 @@ end
 local function backWall(level)
     for x = 1, W do
         local window = ((x == 4 or x == 5 or x == 11 or x == 12) and level >= 2 and level <= 4)
-        if window then place(GLASS) else place(WALL) end
+
+        if window then
+            place(GLASS)
+        else
+            place(WALL)
+        end
+
         if x < W then forward() end
     end
 end
@@ -177,34 +247,58 @@ end
 local function sideWall(level)
     for z = 1, D do
         local window = ((z == 3 or z == 4 or z == 8 or z == 9) and level >= 2 and level <= 4)
-        if window then place(GLASS) else place(WALL) end
+
+        if window then
+            place(GLASS)
+        else
+            place(WALL)
+        end
+
         if z < D then forward() end
     end
 end
 
 local function walls()
     print("[2/8] Exterior walls")
+
     for level = 1, H do
-        frontWall(level); right(); sideWall(level); right(); backWall(level); right(); sideWall(level); right()
-        if level < H then up() end
+        frontWall(level)
+        right()
+        sideWall(level)
+        right()
+        backWall(level)
+        right()
+        sideWall(level)
+        right()
+
+        if level < H then
+            up()
+        end
     end
 end
 
-------------------------------------------------------------
--- INTERIOR ROOMS
-------------------------------------------------------------
-
 local function interiorWalls()
     print("[3/8] Interior offices")
-    down(); down(); down(); down()
-    forward(); forward(); forward()
+
+    down()
+    down()
+    down()
+    down()
+
+    forward()
+    forward()
+    forward()
 
     for i = 1, 6 do
         place(INTERIOR)
         if i < 6 then forward() end
     end
 
-    left(); move(6); left(); move(3); right()
+    left()
+    move(6)
+    left()
+    move(3)
+    right()
 
     for i = 1, 4 do
         place(INTERIOR)
@@ -212,85 +306,119 @@ local function interiorWalls()
     end
 end
 
-------------------------------------------------------------
--- DOORS
-------------------------------------------------------------
-
 local function doors()
     print("[4/8] Doors")
+
     move(5)
     place(DOOR)
-    up(); place(DOOR); down()
+    up()
+    place(DOOR)
+    down()
 end
-
-------------------------------------------------------------
--- STAIRS / ENTRANCE
-------------------------------------------------------------
 
 local function entrance()
     print("[5/8] Entrance and stairs")
+
     down()
-    for _ = 1, 3 do
+
+    for i = 1, 3 do
         placeDown(STAIRS)
         forward()
     end
+
     left()
 end
 
-------------------------------------------------------------
--- LIGHTING
-------------------------------------------------------------
-
 local function lighting()
     print("[6/8] Interior lighting")
-    forward(); forward(); placeUp(LIGHT)
-    right(); forward(); forward(); placeUp(LIGHT)
-    left(); left(); forward(); forward(); placeUp(LIGHT)
-    right(); forward(); forward(); placeUp(LIGHT)
-    left(); left()
-end
 
-------------------------------------------------------------
--- SECOND FLOOR
-------------------------------------------------------------
+    forward()
+    forward()
+    placeUp(LIGHT)
+
+    right()
+    forward()
+    forward()
+    placeUp(LIGHT)
+
+    left()
+    left()
+    forward()
+    forward()
+    placeUp(LIGHT)
+
+    right()
+    forward()
+    forward()
+    placeUp(LIGHT)
+
+    left()
+    left()
+end
 
 local function secondFloor()
     print("[7/8] Second floor")
-    up(); up(); up(); up(); up()
+
+    up()
+    up()
+    up()
+    up()
+    up()
 
     for z = 1, D do
         for x = 1, W do
             placeDown(FLOOR)
             if x < W then forward() end
         end
+
         if z < D then
-            if z % 2 == 1 then right(); forward(); right() else left(); forward(); left() end
+            if z % 2 == 1 then
+                right()
+                forward()
+                right()
+            else
+                left()
+                forward()
+                left()
+            end
         end
     end
 
-    if D % 2 == 1 then left(); move(D - 1); left() else right(); move(D - 1); right() end
+    if D % 2 == 1 then
+        left()
+        move(D - 1)
+        left()
+    else
+        right()
+        move(D - 1)
+        right()
+    end
+
     move(W - 1)
     left()
 
-    forward(); forward()
+    forward()
+    forward()
+
     for i = 1, 5 do
         place(INTERIOR)
         if i < 5 then forward() end
     end
 
     right()
+
     for i = 1, 8 do
-        if i ~= 5 then place(INTERIOR) end
+        if i ~= 5 then
+            place(INTERIOR)
+        end
+
         if i < 8 then forward() end
     end
 end
 
-------------------------------------------------------------
--- ROOF
-------------------------------------------------------------
-
 local function roof()
     print("[8/8] Roof and trim")
+
     up()
 
     for z = 1, D + 2 do
@@ -298,37 +426,60 @@ local function roof()
             placeDown(ROOF)
             if x < W + 2 then forward() end
         end
+
         if z < D + 2 then
-            if z % 2 == 1 then right(); forward(); right() else left(); forward(); left() end
+            if z % 2 == 1 then
+                right()
+                forward()
+                right()
+            else
+                left()
+                forward()
+                left()
+            end
         end
     end
 
     up()
+
     for i = 1, W do
         place(TRIM)
         if i < W then forward() end
     end
 end
 
-------------------------------------------------------------
--- MAIN
-------------------------------------------------------------
+term.clear()
+term.setCursorPos(1, 1)
 
-term.clear(); term.setCursorPos(1, 1)
 print("=======================================")
 print("       AMERICAN OFFICE BUILDER")
 print("=======================================")
 print("")
 print("Office: 15 x 11")
 print("Floors: 2")
-print("Supply system: ONLINE")
 print("")
+print("Materials must be in slots 1-10.")
 print("Starting in 5 seconds...")
-fuel(); sleep(5)
 
-foundation(); walls(); interiorWalls(); doors(); entrance(); lighting(); secondFloor(); roof()
+fuel()
+sleep(5)
+
+foundation()
+walls()
+interiorWalls()
+doors()
+entrance()
+lighting()
+secondFloor()
+roof()
 
 print("")
 print("=======================================")
 print("          OFFICE COMPLETE")
 print("=======================================")
+print("")
+print("Ground floor: reception + offices")
+print("Second floor: offices + meeting areas")
+print("Features: glass facade, entrance, stairs,")
+print("interior walls, lighting and roof")
+print("")
