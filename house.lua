@@ -1,6 +1,3 @@
-local supply = require("supply")
-supply.start()
-
 -- =========================================================
 --        AMERICAN SUBURBAN HOUSE BUILDER
 --                 CC:Tweaked Turtle
@@ -41,7 +38,7 @@ local function waitForItem(slot)
         print("")
         print("OUT OF MATERIAL")
         print("Slot: " .. slot)
-        print("Insert one starter item and press ENTER")
+        print("Insert blocks and press ENTER")
         read()
     end
     select(slot)
@@ -253,7 +250,6 @@ print("================================")
 print("")
 print("Size: 11 x 11")
 print("Height: 5")
-print("Supply system: ONLINE")
 print("Starting in 5 seconds...")
 refuel(); sleep(5)
 buildFloor(); buildWalls(); installFrontDoor(); buildInteriorWalls(); addLights(); buildPorch(); buildStairs(); buildRoof(); buildChimney()
