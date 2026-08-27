@@ -1,20 +1,24 @@
--- SMART CITY ROAD WALKER
+-- SMART CITY ROAD WALKER v2
 -- CC:Tweaked
--- Polished Andesite Road
+-- Walks ONLY on polished andesite roads
 --
--- Designed for:
--- * Wide roads
--- * Curved roads
+-- This version does NOT move while scanning.
+-- It turns in place, inspects the block in each direction,
+-- and only moves when the destination block is polished andesite.
+--
+-- Supports:
+-- * Different road widths
 -- * Intersections
--- * Different road directions
--- * Large road networks
--- * Random wandering
--- * Obstacle avoidance
+-- * Turns
+-- * Zig-zag / diagonal-looking roads made from connected blocks
+-- * Random wandering without leaving the road
+-- * Anti-loop behavior
 
 local ROAD = "minecraft:polished_andesite"
 
 local STEP_DELAY = 0.18
-local TURN_DELAY = 0.08
+local TURN_DELAY = 0.05
+local LOOP_MEMORY = 80
 
 --------------------------------------------------
 -- DIRECTIONS
@@ -26,6 +30,15 @@ local TURN_DELAY = 0.08
 -- 3 = West
 
 local heading = 0
+
+--------------------------------------------------
+-- POSITION MEMORY
+--------------------------------------------------
+
+-- This is only the turtle's local map.
+-- It does not need real Minecraft coordinates.
+local posX = 0
+local posZ = 0
 
 local dx = {
     [0] = 0,
@@ -41,44 +54,54 @@ local dz = {
     [3] = 0
 }
 
---------------------------------------------------
--- LOCAL POSITION
---------------------------------------------------
-
-local posX = 0
-local posZ = 0
-
 local visited = {}
+local history = {}
 
 --------------------------------------------------
--- BASIC FUNCTIONS
+-- BASIC HELPERS
 --------------------------------------------------
 
 local function key(x, z)
     return tostring(x) .. ":" .. tostring(z)
 end
 
-local function markVisited()
-    visited[key(posX, posZ)] = true
+local function markVisited(x, z)
+    visited[key(x, z)] = true
 end
 
 local function wasVisited(x, z)
     return visited[key(x, z)] == true
 end
 
+local function rememberPosition()
+    local k = key(posX, posZ)
+    table.insert(history, k)
+
+    if #history > LOOP_MEMORY then
+        table.remove(history, 1)
+    end
+end
+
+local function recentlyVisited(x, z)
+    local k = key(x, z)
+
+    for i = #history, math.max(1, #history - 25), -1 do
+        if history[i] == k then
+            return true
+        end
+    end
+
+    return false
+end
+
 --------------------------------------------------
--- ROAD CHECK
+-- CURRENT ROAD CHECK
 --------------------------------------------------
 
 local function isRoadUnderTurtle()
-
     local ok, data = turtle.inspectDown()
 
-    if not ok then
-        return false
-    end
-
-    if not data then
+    if not ok or not data then
         return false
     end
 
@@ -86,120 +109,229 @@ local function isRoadUnderTurtle()
 end
 
 --------------------------------------------------
--- TURN TO GLOBAL DIRECTION
+-- LOOK IN FRONT
 --------------------------------------------------
 
-local function turnTo(target)
+local function isRoadInDirection(dir)
+    local oldHeading = heading
 
-    local difference = (target - heading) % 4
-
-    if difference == 0 then
-        return
-    end
+    -- Turn toward the direction we want to inspect.
+    local difference = (dir - heading) % 4
 
     if difference == 1 then
-
         turtle.turnRight()
         heading = (heading + 1) % 4
 
     elseif difference == 2 then
-
         turtle.turnRight()
         turtle.turnRight()
         heading = (heading + 2) % 4
 
     elseif difference == 3 then
-
         turtle.turnLeft()
         heading = (heading + 3) % 4
     end
 
     sleep(TURN_DELAY)
-end
 
---------------------------------------------------
--- CHECK ONE NEIGHBOR
---
--- The turtle physically moves there,
--- checks the road, then returns.
---------------------------------------------------
+    local ok, data = turtle.inspect()
 
-local function checkDirection(dir)
+    local road = false
 
-    local oldHeading = heading
-
-    turnTo(dir)
-
-    -- Physical obstacle
-    if turtle.detect() then
-        turnTo(oldHeading)
-        return false
+    if ok and data and data.name == ROAD then
+        road = true
     end
 
-    -- Try moving
-    if not turtle.forward() then
-        turnTo(oldHeading)
-        return false
-    end
+    -- Restore original heading.
+    local restore = (oldHeading - heading) % 4
 
-    sleep(0.05)
+    if restore == 1 then
+        turtle.turnRight()
+        heading = (heading + 1) % 4
 
-    local road = isRoadUnderTurtle()
-
-    -- Return to original position
-    if not turtle.back() then
-        -- This should almost never happen.
-        -- Try turning around and moving back.
-        turtle.turnLeft()
-        turtle.turnLeft()
+    elseif restore == 2 then
+        turtle.turnRight()
+        turtle.turnRight()
         heading = (heading + 2) % 4
 
-        turtle.forward()
-
+    elseif restore == 3 then
         turtle.turnLeft()
-        turtle.turnLeft()
-        heading = (heading + 2) % 4
+        heading = (heading + 3) % 4
     end
 
-    turnTo(oldHeading)
+    sleep(TURN_DELAY)
 
     return road
 end
 
 --------------------------------------------------
--- CHECK ALL 4 DIRECTIONS
+-- TURN TO DIRECTION
+--------------------------------------------------
+
+local function turnTo(target)
+    local difference = (target - heading) % 4
+
+    if difference == 1 then
+        turtle.turnRight()
+        heading = (heading + 1) % 4
+
+    elseif difference == 2 then
+        turtle.turnRight()
+        turtle.turnRight()
+        heading = (heading + 2) % 4
+
+    elseif difference == 3 then
+        turtle.turnLeft()
+        heading = (heading + 3) % 4
+    end
+
+    if difference ~= 0 then
+        sleep(TURN_DELAY)
+    end
+end
+
+--------------------------------------------------
+-- SCAN ROAD AROUND TURTLE
 --------------------------------------------------
 
 local function scanRoad()
+    local options = {}
 
-    local available = {}
+    for dir = 0, 3 do
+        if isRoadInDirection(dir) then
+            local nx = posX + dx[dir]
+            local nz = posZ + dz[dir]
 
-    for i = 0, 3 do
-
-        if checkDirection(i) then
-
-            local nx = posX + dx[i]
-            local nz = posZ + dz[i]
-
-            table.insert(available, {
-                dir = i,
+            table.insert(options, {
+                dir = dir,
                 x = nx,
                 z = nz,
-                visited = wasVisited(nx, nz)
+                visited = wasVisited(nx, nz),
+                recent = recentlyVisited(nx, nz)
             })
         end
     end
 
-    return available
+    return options
 end
 
 --------------------------------------------------
--- MOVE ONE STEP
+-- REMOVE BAD LOOP CHOICES
+--------------------------------------------------
+
+local function filterFresh(options)
+    local fresh = {}
+
+    for _, option in ipairs(options) do
+        if not option.visited and not option.recent then
+            table.insert(fresh, option)
+        end
+    end
+
+    if #fresh > 0 then
+        return fresh
+    end
+
+    -- Second chance: any unvisited road, even if recently visited.
+    fresh = {}
+
+    for _, option in ipairs(options) do
+        if not option.visited then
+            table.insert(fresh, option)
+        end
+    end
+
+    return fresh
+end
+
+--------------------------------------------------
+-- CHOOSE PATH
+--------------------------------------------------
+
+local function choosePath(options)
+    if #options == 0 then
+        return nil
+    end
+
+    local opposite = (heading + 2) % 4
+
+    ------------------------------------------------
+    -- 1. Fresh road straight ahead.
+    ------------------------------------------------
+
+    for _, option in ipairs(options) do
+        if option.dir == heading and not option.visited and not option.recent then
+            return option.dir
+        end
+    end
+
+    ------------------------------------------------
+    -- 2. Any other fresh road.
+    ------------------------------------------------
+
+    local fresh = filterFresh(options)
+
+    if #fresh > 0 then
+        -- Avoid an immediate U-turn when another road exists.
+        local noReverse = {}
+
+        for _, option in ipairs(fresh) do
+            if option.dir ~= opposite then
+                table.insert(noReverse, option)
+            end
+        end
+
+        if #noReverse > 0 then
+            fresh = noReverse
+        end
+
+        return fresh[math.random(1, #fresh)].dir
+    end
+
+    ------------------------------------------------
+    -- 3. Everything nearby was visited.
+    -- Prefer straight, then avoid reversing.
+    ------------------------------------------------
+
+    for _, option in ipairs(options) do
+        if option.dir == heading then
+            return option.dir
+        end
+    end
+
+    local noReverse = {}
+
+    for _, option in ipairs(options) do
+        if option.dir ~= opposite then
+            table.insert(noReverse, option)
+        end
+    end
+
+    if #noReverse > 0 then
+        return noReverse[math.random(1, #noReverse)].dir
+    end
+
+    ------------------------------------------------
+    -- 4. Only remaining road is behind us.
+    ------------------------------------------------
+
+    return options[1].dir
+end
+
+--------------------------------------------------
+-- MOVE ONTO ROAD
 --------------------------------------------------
 
 local function moveDirection(dir)
-
+    -- IMPORTANT: this function only moves after the target
+    -- direction has already been confirmed to be polished andesite.
     turnTo(dir)
+
+    local ok, data = turtle.inspect()
+
+    if not ok or not data or data.name ~= ROAD then
+        return false
+    end
 
     if turtle.detect() then
         return false
@@ -212,7 +344,8 @@ local function moveDirection(dir)
     posX = posX + dx[dir]
     posZ = posZ + dz[dir]
 
-    markVisited()
+    markVisited(posX, posZ)
+    rememberPosition()
 
     sleep(STEP_DELAY)
 
@@ -220,124 +353,19 @@ local function moveDirection(dir)
 end
 
 --------------------------------------------------
--- CHOOSE BEST PATH
+-- DEAD END HANDLING
 --------------------------------------------------
 
-local function choosePath(options)
+local function handleDeadEnd()
+    -- At a real dead end the only road will normally be behind us.
+    -- Scan again rather than spinning forever.
+    local options = scanRoad()
 
-    if #options == 0 then
-        return nil
-    end
+    if #options > 0 then
+        local direction = choosePath(options)
 
-    ------------------------------------------------
-    -- First preference:
-    -- UNVISITED roads
-    ------------------------------------------------
-
-    local fresh = {}
-
-    for _, option in ipairs(options) do
-
-        if not option.visited then
-            table.insert(fresh, option)
-        end
-    end
-
-    if #fresh > 0 then
-
-        ------------------------------------------------
-        -- Prefer going straight
-        ------------------------------------------------
-
-        for _, option in ipairs(fresh) do
-
-            if option.dir == heading then
-                return option.dir
-            end
-        end
-
-        ------------------------------------------------
-        -- Otherwise random fresh direction
-        ------------------------------------------------
-
-        local chosen = fresh[math.random(1, #fresh)]
-
-        return chosen.dir
-    end
-
-    ------------------------------------------------
-    -- Everything nearby was visited.
-    -- Prefer straight.
-    ------------------------------------------------
-
-    for _, option in ipairs(options) do
-
-        if option.dir == heading then
-            return option.dir
-        end
-    end
-
-    ------------------------------------------------
-    -- Avoid reversing direction unless necessary.
-    ------------------------------------------------
-
-    local alternatives = {}
-
-    for _, option in ipairs(options) do
-
-        local opposite = (heading + 2) % 4
-
-        if option.dir ~= opposite then
-            table.insert(alternatives, option)
-        end
-    end
-
-    if #alternatives > 0 then
-
-        local chosen =
-            alternatives[math.random(1, #alternatives)]
-
-        return chosen.dir
-    end
-
-    ------------------------------------------------
-    -- Only way is backwards.
-    ------------------------------------------------
-
-    return options[1].dir
-end
-
---------------------------------------------------
--- FIND ESCAPE
---------------------------------------------------
-
-local function escapeRoad()
-
-    print("No new road nearby.")
-
-    -- Search around us again
-    for i = 1, 4 do
-
-        turnTo(i - 1)
-
-        if not turtle.detect() then
-
-            if turtle.forward() then
-
-                posX = posX + dx[heading]
-                posZ = posZ + dz[heading]
-
-                sleep(STEP_DELAY)
-
-                if isRoadUnderTurtle() then
-
-                    markVisited()
-                    return true
-                end
-            end
-
-            -- If not road, return
-            turtle.back()
+        if direction then
+            return moveDirection(direction)
         end
     end
 
@@ -348,30 +376,30 @@ end
 -- START
 --------------------------------------------------
 
+math.randomseed(os.epoch("utc"))
+
 term.clear()
 term.setCursorPos(1, 1)
 
 print("SMART CITY ROAD WALKER")
 print("======================")
 print("")
-print("Road:")
-print("Polished Andesite")
+print("Road: polished andesite")
 print("")
-print("Scanning road network...")
+print("Checking starting position...")
 print("")
 
-sleep(1)
+sleep(0.7)
 
 --------------------------------------------------
 -- START CONDITION
 --------------------------------------------------
 
 if not isRoadUnderTurtle() then
-
-    print("ERROR:")
+    print("ERROR")
     print("Turtle is not on a road!")
     print("")
-    print("Place turtle on")
+    print("Place the turtle on")
     print("polished andesite.")
 
     while true do
@@ -379,10 +407,11 @@ if not isRoadUnderTurtle() then
     end
 end
 
-markVisited()
+markVisited(posX, posZ)
+rememberPosition()
 
 print("Road detected!")
-print("Wandering...")
+print("Walking on road...")
 print("")
 
 --------------------------------------------------
@@ -390,65 +419,35 @@ print("")
 --------------------------------------------------
 
 while true do
-
-    ------------------------------------------------
-    -- Scan around us
-    ------------------------------------------------
-
     local roads = scanRoad()
-
-    ------------------------------------------------
-    -- Select destination
-    ------------------------------------------------
-
     local direction = choosePath(roads)
 
-    ------------------------------------------------
-    -- Move
-    ------------------------------------------------
-
     if direction then
-
         local success = moveDirection(direction)
 
         if not success then
-            sleep(0.5)
+            sleep(0.25)
         end
-
     else
-
-        ------------------------------------------------
-        -- No normal path.
-        -- Rotate and search for another road section.
-        ------------------------------------------------
-
-        print("Dead end / blocked road")
-
-        if not escapeRoad() then
-
-            -- Nothing found.
-            -- Slowly rotate and retry.
-            turtle.turnRight()
-            heading = (heading + 1) % 4
-
-            sleep(0.5)
-        end
+        -- No road neighbor found.
+        -- Wait and rescan instead of blindly rotating.
+        sleep(0.4)
+        handleDeadEnd()
     end
 
     ------------------------------------------------
-    -- Prevent visited table from growing forever
+    -- Keep memory bounded.
     ------------------------------------------------
 
     local count = 0
 
     for _ in pairs(visited) do
         count = count + 1
+    end
 
-        if count > 10000 then
-            visited = {}
-            markVisited()
-            break
-        end
+    if count > 12000 then
+        visited = {}
+        markVisited(posX, posZ)
     end
 
     sleep(STEP_DELAY)
