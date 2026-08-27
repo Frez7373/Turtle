@@ -5,42 +5,42 @@
 
 local ROAD = "minecraft:polished_andesite"
 local heading = 0
+local stuckCount = 0
 
-math.randomseed(os.epoch("utc"))
-
-local function turnRight()
+local function right()
     turtle.turnRight()
     heading = (heading + 1) % 4
 end
 
-local function turnLeft()
+local function left()
     turtle.turnLeft()
     heading = (heading + 3) % 4
 end
 
-local function turnAround()
+local function backTurn()
     turtle.turnRight()
     turtle.turnRight()
     heading = (heading + 2) % 4
 end
 
-local function turnTo(dir)
-    local diff = (dir - heading) % 4
-    if diff == 1 then
-        turnRight()
-    elseif diff == 2 then
-        turnAround()
-    elseif diff == 3 then
-        turnLeft()
+local function face(dir)
+    local d = (dir - heading) % 4
+    if d == 1 then
+        right()
+    elseif d == 2 then
+        backTurn()
+    elseif d == 3 then
+        left()
     end
 end
 
-local function isRoadBelow()
-    local ok, block = turtle.inspectDown()
-    return ok and block and block.name == ROAD
+local function roadBelow()
+    local ok, data = turtle.inspectDown()
+    return ok and data.name == ROAD
 end
 
-local function roadAhead()
+-- Move one block, then verify that the new block is road.
+local function step()
     if turtle.detect() then
         return false
     end
@@ -49,114 +49,113 @@ local function roadAhead()
         return false
     end
 
-    local road = isRoadBelow()
-    turtle.back()
-    return road
+    return roadBelow()
 end
 
-local function checkDirection(dir)
-    turnTo(dir)
-    return roadAhead()
-end
-
-local function chooseDirection()
-    local forward = heading
-    local left = (heading + 3) % 4
-    local right = (heading + 1) % 4
-    local back = (heading + 2) % 4
-
-    if checkDirection(forward) then
-        return forward
-    end
-
-    if math.random(1, 2) == 1 then
-        if checkDirection(left) then
-            return left
-        end
-        if checkDirection(right) then
-            return right
-        end
-    else
-        if checkDirection(right) then
-            return right
-        end
-        if checkDirection(left) then
-            return left
-        end
-    end
-
-    if checkDirection(back) then
-        return back
-    end
-
-    return nil
-end
-
-local function moveOneBlock(dir)
-    turnTo(dir)
+-- Test one direction without permanently moving.
+local function test(dir)
+    face(dir)
 
     if turtle.detect() then
         return false
     end
 
-    return turtle.forward()
+    if not turtle.forward() then
+        return false
+    end
+
+    local good = roadBelow()
+    turtle.back()
+    return good
 end
 
-print("================================")
-print(" WALK5 - ROAD WALKER")
-print("================================")
+-- Find possible road directions.
+-- IMPORTANT: this returns WORLD/FACING directions, not relative ones.
+local function findRoad()
+    local dirs = {}
+
+    -- Current direction first.
+    local candidates = {
+        heading,
+        (heading + 3) % 4,
+        (heading + 1) % 4,
+        (heading + 2) % 4
+    }
+
+    for _, dir in ipairs(candidates) do
+        if test(dir) then
+            table.insert(dirs, dir)
+        end
+    end
+
+    return dirs
+end
+
+print("WALK5 START")
 print("Road: polished andesite")
-print("")
 
-if isRoadBelow() then
-    print("Road detected!")
-else
-    print("WARNING: turtle is not on road")
-    print("Place turtle on polished andesite")
+if not roadBelow() then
+    print("ERROR: turtle is not on polished andesite!")
+    print("Put the turtle on the road and run walk5 again.")
+    return
 end
 
+print("Road detected.")
 sleep(1)
 term.clear()
 term.setCursorPos(1, 1)
 
 while true do
-    if not isRoadBelow() then
-        print("Searching for road...")
+    -- Always stay on the road.
+    if not roadBelow() then
+        print("Lost road - stopping.")
+        print("Turtle position is not on polished andesite.")
+        break
+    end
 
-        local found = false
-        local dirs = {
-            heading,
-            (heading + 1) % 4,
-            (heading + 3) % 4,
-            (heading + 2) % 4
-        }
-
-        for _, dir in ipairs(dirs) do
-            if checkDirection(dir) then
-                if moveOneBlock(dir) then
-                    found = true
-                    break
-                end
-            end
-        end
-
-        if not found then
-            sleep(1)
+    -- First try the current direction without turning.
+    if not turtle.detect() then
+        if turtle.forward() then
+            stuckCount = 0
+            sleep(0.2)
+        else
+            stuckCount = stuckCount + 1
         end
     else
-        local dir = chooseDirection()
+        stuckCount = stuckCount + 1
+    end
 
-        if dir ~= nil then
-            if not moveOneBlock(dir) then
-                sleep(0.2)
+    -- If forward is blocked, or movement failed, find a new road direction.
+    if stuckCount > 0 then
+        local roads = findRoad()
+
+        if #roads > 0 then
+            -- Prefer a direction other than going straight back.
+            local chosen = roads[1]
+
+            if #roads > 1 then
+                for _, dir in ipairs(roads) do
+                    if dir ~= ((heading + 2) % 4) then
+                        chosen = dir
+                        break
+                    end
+                end
+            end
+
+            face(chosen)
+
+            if not turtle.detect() and turtle.forward() then
+                stuckCount = 0
+            else
+                stuckCount = 1
             end
         else
-            turnAround()
-            if not turtle.detect() then
-                turtle.forward()
-            end
+            -- No neighboring road. Turn once and retry later.
+            -- This is NOT a continuous spin.
+            right()
+            sleep(0.5)
         end
     end
 
-    sleep(0.25)
+    sleep(0.15)
 end
