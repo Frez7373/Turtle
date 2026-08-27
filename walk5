@@ -4,124 +4,119 @@
 -- =========================================
 
 local ROAD = "minecraft:polished_andesite"
-local heading = 0
+local DELAY = 0.15
 
-local function right()
-    turtle.turnRight()
-    heading = (heading + 1) % 4
-end
-
-local function left()
-    turtle.turnLeft()
-    heading = (heading + 3) % 4
-end
-
-local function around()
-    turtle.turnRight()
-    turtle.turnRight()
-    heading = (heading + 2) % 4
-end
-
-local function face(dir)
-    local d = (dir - heading) % 4
-    if d == 1 then
-        right()
-    elseif d == 2 then
-        around()
-    elseif d == 3 then
-        left()
-    end
-end
-
-local function isRoadBelow()
+local function roadBelow()
     local ok, data = turtle.inspectDown()
-    return ok and data.name == ROAD
+    return ok and data and data.name == ROAD
 end
 
--- Check the floor of the next block.
--- The turtle temporarily moves one block, checks the floor,
--- then returns to its original position and direction.
-local function roadAhead()
+local function fuelOK()
+    local fuel = turtle.getFuelLevel()
+    if fuel == "unlimited" then
+        return true
+    end
+    if fuel <= 0 then
+        print("NO FUEL")
+        print("Add fuel to the turtle.")
+        return false
+    end
+    return true
+end
+
+-- Try one actual step. If the new block is not road,
+-- immediately return to the previous block.
+local function stepIfRoad()
     if turtle.detect() then
         return false
     end
 
-    if not turtle.forward() then
+    local ok, err = turtle.forward()
+    if not ok then
+        print("MOVE FAILED: " .. tostring(err))
         return false
     end
 
-    local result = isRoadBelow()
+    sleep(0.05)
 
-    turtle.back()
-    return result
-end
-
--- Find road around the turtle.
--- Priority: forward -> left -> right -> back.
-local function findRoad()
-    local original = heading
-    local order = {
-        original,
-        (original + 3) % 4,
-        (original + 1) % 4,
-        (original + 2) % 4
-    }
-
-    for _, dir in ipairs(order) do
-        face(dir)
-
-        if roadAhead() then
-            return dir
-        end
+    if roadBelow() then
+        return true
     end
 
-    face(original)
-    return nil
+    turtle.back()
+    sleep(0.05)
+    return false
 end
 
+local function tryRight()
+    turtle.turnRight()
+    sleep(0.05)
+    return stepIfRoad()
+end
+
+local function tryLeft()
+    turtle.turnLeft()
+    sleep(0.05)
+    return stepIfRoad()
+end
+
+term.clear()
+term.setCursorPos(1, 1)
 print("WALK5 - ROAD WALKER")
 print("Road: polished andesite")
-print("")
+print("--------------------")
 
-if not isRoadBelow() then
+if not fuelOK() then
+    return
+end
+
+if not roadBelow() then
     print("ERROR: NOT ON ROAD")
     print("Place turtle on polished andesite.")
     return
 end
 
 print("ROAD FOUND")
+print("WALKING...")
 sleep(1)
-term.clear()
-term.setCursorPos(1, 1)
 
 while true do
-    -- We must always be standing on the road.
-    if not isRoadBelow() then
-        print("ROAD LOST - STOPPED")
+    if not fuelOK() then
         break
     end
 
-    -- Only choose a direction after checking that its NEXT floor block
-    -- is polished andesite.
-    local dir = findRoad()
-
-    if dir == nil then
-        print("NO ROAD AROUND")
-        print("Turtle stopped.")
-        break
-    end
-
-    face(dir)
-
-    -- The direction has already been checked, but check the obstacle once
-    -- more immediately before moving.
-    if turtle.detect() then
-        sleep(0.2)
+    -- 1. Keep going straight whenever possible.
+    if stepIfRoad() then
+        sleep(DELAY)
     else
-        if not turtle.forward() then
-            sleep(0.2)
+        -- 2. Obstacle or end of this direction.
+        -- Try right once.
+        if tryRight() then
+            sleep(DELAY)
+        else
+            -- 3. Right failed. Turn left twice from the right-facing
+            -- direction. This puts us facing left relative to the original.
+            turtle.turnLeft()
+            turtle.turnLeft()
+            sleep(0.05)
+
+            if stepIfRoad() then
+                sleep(DELAY)
+            else
+                -- 4. Left also failed. Turn right once to restore the
+                -- original direction, then turn around and test backwards.
+                turtle.turnRight()
+                turtle.turnRight()
+                sleep(0.05)
+
+                if stepIfRoad() then
+                    sleep(DELAY)
+                else
+                    print("ROAD ENDED")
+                    print("No reachable road block.")
+                    break
+                end
+            end
         end
     end
-
-    sleep(0.2)
 end
