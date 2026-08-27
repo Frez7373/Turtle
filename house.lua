@@ -1,3 +1,6 @@
+local supply = require("supply")
+supply.start()
+
 -- =========================================================
 --        AMERICAN SUBURBAN HOUSE BUILDER
 --                 CC:Tweaked Turtle
@@ -15,36 +18,30 @@
 -- 7 = STAIRS
 -- 8 = LIGHT
 -- 9 = INTERIOR WALL
---
--- START:
--- Turtle stands at the front-left corner
--- facing along the front of the house.
 -- =========================================================
 
-local SLOT_WALL       = 1
-local SLOT_GLASS      = 2
-local SLOT_DOOR       = 3
-local SLOT_ROOF       = 4
+local SLOT_WALL = 1
+local SLOT_GLASS = 2
+local SLOT_DOOR = 3
+local SLOT_ROOF = 4
 local SLOT_FOUNDATION = 5
-local SLOT_FLOOR      = 6
-local SLOT_STAIRS     = 7
-local SLOT_LIGHT      = 8
-local SLOT_INTERIOR   = 9
+local SLOT_FLOOR = 6
+local SLOT_STAIRS = 7
+local SLOT_LIGHT = 8
+local SLOT_INTERIOR = 9
 
 local HOUSE_W = 11
 local HOUSE_D = 11
-local WALL_H  = 5
+local WALL_H = 5
 
-local function select(slot)
-    turtle.select(slot)
-end
+local function select(slot) turtle.select(slot) end
 
 local function waitForItem(slot)
     if turtle.getItemCount(slot) == 0 then
         print("")
         print("OUT OF MATERIAL")
         print("Slot: " .. slot)
-        print("Insert materials and press ENTER")
+        print("Insert one starter item and press ENTER")
         read()
     end
     select(slot)
@@ -73,26 +70,17 @@ local function left() turtle.turnLeft() end
 
 local function place(slot)
     waitForItem(slot)
-    if not turtle.place() then
-        turtle.dig()
-        turtle.place()
-    end
+    if not turtle.place() then turtle.dig(); turtle.place() end
 end
 
 local function placeDown(slot)
     waitForItem(slot)
-    if not turtle.placeDown() then
-        turtle.digDown()
-        turtle.placeDown()
-    end
+    if not turtle.placeDown() then turtle.digDown(); turtle.placeDown() end
 end
 
 local function placeUp(slot)
     waitForItem(slot)
-    if not turtle.placeUp() then
-        turtle.digUp()
-        turtle.placeUp()
-    end
+    if not turtle.placeUp() then turtle.digUp(); turtle.placeUp() end
 end
 
 local function lineForward(length)
@@ -110,7 +98,7 @@ local function refuel()
     end
     if turtle.getFuelLevel() < 100 then
         print("WARNING: LOW FUEL")
-        print("Put coal in the turtle.")
+        print("Put fuel in the turtle.")
         print("Press ENTER")
         read()
     end
@@ -119,26 +107,16 @@ end
 local function buildFloor()
     print("Building foundation...")
     forward()
-
     for z = 1, HOUSE_D do
         for x = 1, HOUSE_W do
             placeDown(SLOT_FOUNDATION)
             if x < HOUSE_W then forward() end
         end
         if z < HOUSE_D then
-            if z % 2 == 1 then
-                right(); forward(); right()
-            else
-                left(); forward(); left()
-            end
+            if z % 2 == 1 then right(); forward(); right() else left(); forward(); left() end
         end
     end
-
-    if HOUSE_D % 2 == 1 then
-        left(); lineForward(HOUSE_D - 1); left()
-    else
-        right(); lineForward(HOUSE_D - 1); right()
-    end
+    if HOUSE_D % 2 == 1 then left(); lineForward(HOUSE_D - 1); left() else right(); lineForward(HOUSE_D - 1); right() end
     lineForward(HOUSE_W - 1)
     right()
 
@@ -149,19 +127,10 @@ local function buildFloor()
             if x < HOUSE_W then forward() end
         end
         if z < HOUSE_D then
-            if z % 2 == 1 then
-                right(); forward(); right()
-            else
-                left(); forward(); left()
-            end
+            if z % 2 == 1 then right(); forward(); right() else left(); forward(); left() end
         end
     end
-
-    if HOUSE_D % 2 == 1 then
-        left(); lineForward(HOUSE_D - 1); left()
-    else
-        right(); lineForward(HOUSE_D - 1); right()
-    end
+    if HOUSE_D % 2 == 1 then left(); lineForward(HOUSE_D - 1); left() else right(); lineForward(HOUSE_D - 1); right() end
     lineForward(HOUSE_W - 1)
     left()
 end
@@ -170,11 +139,8 @@ local function buildFrontWall(height)
     for x = 1, HOUSE_W do
         local doorArea = (x == 5 or x == 6 or x == 7) and height <= 2
         local windowArea = ((x == 2 or x == 3 or x == 9 or x == 10) and height >= 2 and height <= 3)
-        if doorArea then
-        elseif windowArea then
-            place(SLOT_GLASS)
-        else
-            place(SLOT_WALL)
+        if not doorArea then
+            if windowArea then place(SLOT_GLASS) else place(SLOT_WALL) end
         end
         if x < HOUSE_W then forward() end
     end
@@ -207,14 +173,7 @@ end
 local function buildWalls()
     print("Building walls...")
     for height = 1, WALL_H do
-        buildFrontWall(height)
-        right()
-        buildRightWall(height)
-        right()
-        buildBackWall(height)
-        right()
-        buildLeftWall(height)
-        right()
+        buildFrontWall(height); right(); buildRightWall(height); right(); buildBackWall(height); right(); buildLeftWall(height); right()
         if height < WALL_H then up() end
     end
 end
@@ -231,29 +190,13 @@ end
 local function buildInteriorWalls()
     print("Building interior rooms...")
     forward()
-    for i = 1, 4 do
-        place(SLOT_INTERIOR)
-        if i < 4 then forward() end
-    end
+    for i = 1, 4 do place(SLOT_INTERIOR); if i < 4 then forward() end end
     up()
-    for i = 1, 4 do
-        place(SLOT_INTERIOR)
-        if i < 4 then forward() end
-    end
-    down()
-    left(); lineForward(4); right()
-
-    lineForward(1)
-    right()
-    for i = 1, 7 do
-        if i ~= 4 then place(SLOT_INTERIOR) end
-        if i < 7 then forward() end
-    end
+    for i = 1, 4 do place(SLOT_INTERIOR); if i < 4 then forward() end end
+    down(); left(); lineForward(4); right(); lineForward(1); right()
+    for i = 1, 7 do if i ~= 4 then place(SLOT_INTERIOR) end; if i < 7 then forward() end end
     up()
-    for i = 1, 7 do
-        if i ~= 4 then place(SLOT_INTERIOR) end
-        if i < 7 then forward() end
-    end
+    for i = 1, 7 do if i ~= 4 then place(SLOT_INTERIOR) end; if i < 7 then forward() end end
     down()
 end
 
@@ -270,112 +213,48 @@ local function buildPorch()
     print("Building front porch...")
     for i = 1, 3 do
         right()
-        for x = 1, 7 do
-            placeDown(SLOT_FLOOR)
-            if x < 7 then forward() end
-        end
-        left()
-        if i < 3 then forward() end
+        for x = 1, 7 do placeDown(SLOT_FLOOR); if x < 7 then forward() end end
+        left(); if i < 3 then forward() end
     end
-
-    place(SLOT_WALL); up(); place(SLOT_WALL); up(); place(SLOT_WALL)
-    down(); down()
-    lineForward(6)
-    place(SLOT_WALL); up(); place(SLOT_WALL); up(); place(SLOT_WALL)
-    down(); down()
+    place(SLOT_WALL); up(); place(SLOT_WALL); up(); place(SLOT_WALL); down(); down(); lineForward(6)
+    place(SLOT_WALL); up(); place(SLOT_WALL); up(); place(SLOT_WALL); down(); down()
 end
 
 local function buildStairs()
     print("Building front steps...")
-    right()
-    for _ = 1, 3 do
-        placeDown(SLOT_STAIRS)
-        forward()
-    end
-    left()
+    right(); for _ = 1, 3 do placeDown(SLOT_STAIRS); forward() end; left()
 end
 
 local function buildRoof()
     print("Building roof...")
     up()
-
     for z = 1, HOUSE_D + 2 do
-        for x = 1, HOUSE_W + 2 do
-            placeDown(SLOT_ROOF)
-            if x < HOUSE_W + 2 then forward() end
-        end
-        if z < HOUSE_D + 2 then
-            if z % 2 == 1 then
-                right(); forward(); right()
-            else
-                left(); forward(); left()
-            end
-        end
+        for x = 1, HOUSE_W + 2 do placeDown(SLOT_ROOF); if x < HOUSE_W + 2 then forward() end end
+        if z < HOUSE_D + 2 then if z % 2 == 1 then right(); forward(); right() else left(); forward(); left() end end
     end
-
-    if (HOUSE_D + 2) % 2 == 1 then
-        left(); lineForward(HOUSE_D + 1); left()
-    else
-        right(); lineForward(HOUSE_D + 1); right()
-    end
+    if (HOUSE_D + 2) % 2 == 1 then left(); lineForward(HOUSE_D + 1); left() else right(); lineForward(HOUSE_D + 1); right() end
     lineForward(HOUSE_W + 1)
-
     up()
     for z = 1, HOUSE_D do
-        for x = 1, HOUSE_W do
-            placeDown(SLOT_ROOF)
-            if x < HOUSE_W then forward() end
-        end
-        if z < HOUSE_D then
-            if z % 2 == 1 then
-                right(); forward(); right()
-            else
-                left(); forward(); left()
-            end
-        end
+        for x = 1, HOUSE_W do placeDown(SLOT_ROOF); if x < HOUSE_W then forward() end end
+        if z < HOUSE_D then if z % 2 == 1 then right(); forward(); right() else left(); forward(); left() end end
     end
 end
 
 local function buildChimney()
     print("Building chimney...")
-    up(); place(SLOT_WALL)
-    up(); place(SLOT_WALL)
-    up(); place(SLOT_WALL)
-    down(); down(); down()
+    up(); place(SLOT_WALL); up(); place(SLOT_WALL); up(); place(SLOT_WALL); down(); down(); down()
 end
 
-local function finish()
-    print("")
-    print("==============================")
-    print(" HOUSE CONSTRUCTION COMPLETE")
-    print("==============================")
-    print("")
-    print("Rooms: Living Room / Kitchen / Bedroom / Bathroom")
-    print("Features: Foundation / Windows / Door / Porch / Steps / Interior / Roof / Chimney / Lights")
-    print("")
-end
-
-term.clear()
-term.setCursorPos(1,1)
+term.clear(); term.setCursorPos(1,1)
 print("================================")
 print("  AMERICAN HOUSE BUILDER")
 print("================================")
 print("")
 print("Size: 11 x 11")
 print("Height: 5")
-print("")
-print("Check your materials!")
+print("Supply system: ONLINE")
 print("Starting in 5 seconds...")
-
-refuel()
-sleep(5)
-buildFloor()
-buildWalls()
-installFrontDoor()
-buildInteriorWalls()
-addLights()
-buildPorch()
-buildStairs()
-buildRoof()
-buildChimney()
-finish()
+refuel(); sleep(5)
+buildFloor(); buildWalls(); installFrontDoor(); buildInteriorWalls(); addLights(); buildPorch(); buildStairs(); buildRoof(); buildChimney()
+print(""); print("HOUSE CONSTRUCTION COMPLETE")
